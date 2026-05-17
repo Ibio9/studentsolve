@@ -317,8 +317,8 @@ function BoardPicker({ subject, boards, anchorEl, onSelect, onClose }) {
     function handleClick(e) {
       if (anchorEl && !anchorEl.contains(e.target)) onClose();
     }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
   }, [anchorEl, onClose]);
 
   return ReactDOM.createPortal(
