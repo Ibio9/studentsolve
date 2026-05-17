@@ -1,0 +1,7 @@
+node_modules/
+.env
+studentsolve/server/node_modules/
+studentsolve/client/node_modules/
+studentsolve/server/.env
+studentsolve/client/.env    
+
