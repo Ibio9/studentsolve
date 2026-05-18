@@ -95,7 +95,7 @@ export default function LoginPage() {
         </div>
 
         <p style={{ textAlign: 'center', marginTop: 20, color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-          plottwist? <Link to="/signup">Sign up free</Link>
+          applesauce? <Link to="/signup">Sign up free</Link>
         </p>
       </div>
     </div>
