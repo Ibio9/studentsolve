@@ -314,11 +314,13 @@ function BoardPicker({ subject, boards, anchorEl, onSelect, onClose }) {
   }, [anchorEl, boards.length]);
 
   useEffect(() => {
-    function handleClick(e) {
+  function handleClick(e) {
+    setTimeout(() => {
       if (anchorEl && !anchorEl.contains(e.target)) onClose();
-    }
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
+    }, 0);
+  }
+  document.addEventListener('click', handleClick);
+  return () => document.removeEventListener('click', handleClick);
   }, [anchorEl, onClose]);
 
   return ReactDOM.createPortal(
