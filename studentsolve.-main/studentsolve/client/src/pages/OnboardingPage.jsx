@@ -1,10 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { saveUserProfile } from '../firebase/firestore.js';
-import ReactDOM from 'react-dom';
 
-// ── GCSE boards per subject ────────────────────────────────────────────────
 const GCSE_SUBJECT_BOARDS = {
   'Maths':                        ['AQA', 'Edexcel', 'OCR', 'WJEC / Eduqas', 'CCEA', "I'm not sure"],
   'Further Maths':                ['AQA', 'CCEA', "I'm not sure"],
@@ -297,62 +295,89 @@ function getSubjectData(quals) {
   return { subjects: GCSE_SUBJECTS, boards: GCSE_SUBJECT_BOARDS };
 }
 
-// ── Portal-based BoardPicker ───────────────────────────────────────────────
-// Uses position:fixed so it never gets clipped by overflow:auto scroll containers
-function BoardPicker({ subject, boards, anchorEl, onSelect, onClose }) {
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+// ── Subject button with inline board picker ────────────────────────────────
+// No portal, no external click listeners — board picker is a sibling div
+// that shows/hides based on local state only
+function SubjectButton({ subject, boards, isSelected, board, onSelect, onDeselect }) {
+  const [showPicker, setShowPicker] = useState(false);
 
-  useEffect(() => {
-    if (!anchorEl) return;
-    const rect = anchorEl.getBoundingClientRect();
-    const dropdownHeight = Math.min(boards.length * 40 + 60, 320);
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const top = spaceBelow > dropdownHeight
-      ? rect.bottom + 4
-      : rect.top - dropdownHeight - 4;
-    setPos({ top, left: rect.left, width: rect.width });
-  }, [anchorEl, boards.length]);
-
-  useEffect(() => {
-  function handleClick(e) {
-    setTimeout(() => {
-      if (anchorEl && !anchorEl.contains(e.target)) onClose();
-    }, 0);
+  function handleClick() {
+    if (isSelected) {
+      onDeselect(subject);
+    } else {
+      setShowPicker(true);
+    }
   }
-  document.addEventListener('click', handleClick);
-  return () => document.removeEventListener('click', handleClick);
-  }, [anchorEl, onClose]);
 
-  return ReactDOM.createPortal(
-    <div style={{
-      position: 'fixed',
-      top: pos.top,
-      left: pos.left,
-      width: Math.max(pos.width, 200),
-      background: 'var(--bg-elevated)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      zIndex: 9999,
-      boxShadow: 'var(--shadow-lg)',
-      overflow: 'hidden',
-      maxHeight: 320,
-      overflowY: 'auto',
-    }}>
-      <div style={{ padding: '8px 12px 6px', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>
-        Exam board
-      </div>
-      {boards.map(b => (
-        <button key={b} onClick={e => { e.stopPropagation(); onSelect(b); }}
-          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: '0.83rem', background: 'none', border: 'none', color: b === "I'm not sure" ? 'var(--text-muted)' : 'var(--text-secondary)', cursor: 'pointer', fontStyle: b === "I'm not sure" ? 'italic' : 'normal' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'none'}
-        >{b}</button>
-      ))}
-      <button onClick={e => { e.stopPropagation(); onClose(); }}
-        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: '0.78rem', background: 'none', border: 'none', borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)', cursor: 'pointer' }}
-      >✕ Cancel</button>
-    </div>,
-    document.body
+  function handleBoardClick(b) {
+    setShowPicker(false);
+    onSelect(subject, b);
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={handleClick}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '10px 12px',
+          borderRadius: 'var(--radius)',
+          border: `1.5px solid ${isSelected ? 'var(--accent)' : showPicker ? 'var(--border)' : 'var(--border-subtle)'}`,
+          background: isSelected ? 'var(--accent-dim)' : showPicker ? 'var(--bg-hover)' : 'var(--bg-card)',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+          textAlign: 'left',
+        }}
+      >
+        <div style={{ width: 15, height: 15, borderRadius: 3, flexShrink: 0, border: `1.5px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`, background: isSelected ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {isSelected && <span style={{ fontSize: '0.55rem', color: '#0d0d0f', fontWeight: 900 }}>✓</span>}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.83rem', fontWeight: isSelected ? 600 : 400, color: isSelected ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subject}</div>
+          {isSelected && board && board !== "I'm not sure" && (
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>{board}</div>
+          )}
+        </div>
+      </button>
+
+      {/* Inline board picker — no portal, no event listeners */}
+      {showPicker && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          minWidth: 200,
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          zIndex: 9999,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          marginTop: 4,
+          overflow: 'hidden',
+        }}>
+          <div style={{ padding: '8px 12px 6px', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>
+            Exam board
+          </div>
+          {boards.map(b => (
+            <button
+              key={b}
+              onClick={e => { e.stopPropagation(); handleBoardClick(b); }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: '0.83rem', background: 'none', border: 'none', color: b === "I'm not sure" ? 'var(--text-muted)' : 'var(--text-secondary)', cursor: 'pointer', fontStyle: b === "I'm not sure" ? 'italic' : 'normal' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >{b}</button>
+          ))}
+          <button
+            onClick={e => { e.stopPropagation(); setShowPicker(false); }}
+            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: '0.78rem', background: 'none', border: 'none', borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)', cursor: 'pointer' }}
+          >✕ Cancel</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -364,8 +389,6 @@ export default function OnboardingPage() {
   const [selectedQuals, setSelectedQuals] = useState([]);
   const [selectedSubjects, setSelectedSubjects] = useState({});
   const [search, setSearch] = useState('');
-  const [pickerSubject, setPickerSubject] = useState(null); // subject name
-  const [pickerAnchor, setPickerAnchor] = useState(null);  // DOM element ref
   const [otherInputs, setOtherInputs] = useState(['']);
   const [loading, setLoading] = useState(false);
 
@@ -381,27 +404,12 @@ export default function OnboardingPage() {
     setSearch('');
   }
 
-  function handleSubjectClick(subject, el) {
-    if (selectedSubjects[subject] !== undefined) {
-      // Already selected — deselect
-      setSelectedSubjects(prev => { const c = { ...prev }; delete c[subject]; return c; });
-    } else {
-      // Open board picker
-      setPickerSubject(subject);
-      setPickerAnchor(el);
-    }
+  function handleSelect(subject, board) {
+    setSelectedSubjects(prev => ({ ...prev, [subject]: board }));
   }
 
-  function selectBoard(board) {
-    if (!pickerSubject) return;
-    setSelectedSubjects(prev => ({ ...prev, [pickerSubject]: board }));
-    setPickerSubject(null);
-    setPickerAnchor(null);
-  }
-
-  function closePicker() {
-    setPickerSubject(null);
-    setPickerAnchor(null);
+  function handleDeselect(subject) {
+    setSelectedSubjects(prev => { const c = { ...prev }; delete c[subject]; return c; });
   }
 
   async function handleFinish() {
@@ -439,7 +447,6 @@ export default function OnboardingPage() {
     <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: step === 3 ? 720 : 560 }}>
 
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--text-primary)', marginBottom: 20 }}>StudentSolve</div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 28 }}>
@@ -457,7 +464,6 @@ export default function OnboardingPage() {
           </p>
         </div>
 
-        {/* STEP 1 */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -476,7 +482,6 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 2 */}
         {step === 2 && (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
@@ -501,7 +506,6 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 3 */}
         {step === 3 && (
           <div>
             <div style={{ position: 'relative', marginBottom: 16 }}>
@@ -509,60 +513,22 @@ export default function OnboardingPage() {
               <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>🔍</span>
             </div>
 
-            {/* Subject grid — no overflow:hidden, just scroll with padding at bottom */}
             <div style={{ maxHeight: 420, overflowY: 'auto', marginBottom: 20, paddingBottom: 8 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: 8 }}>
-                {filteredSubjects.map(subject => {
-                  const isSelected = subject in selectedSubjects;
-                  const board = selectedSubjects[subject];
-
-                  return (
-                    <button
-                      key={subject}
-                      onClick={e => handleSubjectClick(subject, e.currentTarget)}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '10px 12px',
-                        borderRadius: 'var(--radius)',
-                        border: `1.5px solid ${isSelected ? 'var(--accent)' : 'var(--border-subtle)'}`,
-                        background: isSelected ? 'var(--accent-dim)' : 'var(--bg-card)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        textAlign: 'left',
-                      }}
-                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = 'var(--border)'; }}
-                      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
-                    >
-                      <div style={{ width: 15, height: 15, borderRadius: 3, flexShrink: 0, border: `1.5px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`, background: isSelected ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {isSelected && <span style={{ fontSize: '0.55rem', color: '#0d0d0f', fontWeight: 900 }}>✓</span>}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.83rem', fontWeight: isSelected ? 600 : 400, color: isSelected ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subject}</div>
-                        {isSelected && board && board !== "I'm not sure" && (
-                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>{board}</div>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                {filteredSubjects.map(subject => (
+                  <SubjectButton
+                    key={subject}
+                    subject={subject}
+                    boards={boardMap[subject] || ["I'm not sure"]}
+                    isSelected={subject in selectedSubjects}
+                    board={selectedSubjects[subject]}
+                    onSelect={handleSelect}
+                    onDeselect={handleDeselect}
+                  />
+                ))}
               </div>
             </div>
 
-            {/* Portal board picker */}
-            {pickerSubject && pickerAnchor && (
-              <BoardPicker
-                subject={pickerSubject}
-                boards={boardMap[pickerSubject] || ["I'm not sure"]}
-                anchorEl={pickerAnchor}
-                onSelect={selectBoard}
-                onClose={closePicker}
-              />
-            )}
-
-            {/* Other subjects */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>Other / not listed</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
